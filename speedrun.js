@@ -1,18 +1,9 @@
-// keeping this helper function incase I need it later
+// Helper function to add delay
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function selectAllLabels() {
-    // It's 2am and I'm too lazy to write a proper selector, let's just select all labels
-    const labels = document.querySelectorAll("label");
-
-    labels.forEach(async (label) => {
-        await sleep(500);
-        label.click();
-    });
-}
-
+// Function to trigger a click event
 function triggerTextareaClick(textarea) {
     const mouseEvent = new MouseEvent("click", {
         bubbles: true,
@@ -23,47 +14,95 @@ function triggerTextareaClick(textarea) {
     textarea.dispatchEvent(mouseEvent);
 }
 
-async function answerQuestion() {
+// Function to call OpenAI's GPT API to get an answer
+async function fetchAnswerFromLLM(question) {
+    const apiKey = "your_openai_api_key"; // Replace with your OpenAI API key
+    const endpoint = "https://api.openai.com/v1/chat/completions";
+
     try {
-        // this is for that question type where you have to rearrange words correctly or something
-        const passageOptionsDiv = document.querySelector(
-            ".converse-pasage-options"
-        );
-        if (passageOptionsDiv) {
-            const buttons = passageOptionsDiv.querySelectorAll("button");
-            buttons.forEach(async (button) => {
-                await sleep(500);
-                button.click();
-            });
-            console.log("Answered using buttons in 'converse-pasage-options'.");
-            return;
-        }
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+                model: "gpt-4", // Replace with the desired model (e.g., gpt-3.5-turbo)
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are a helpful assistant.",
+                    },
+                    {
+                        role: "user",
+                        content: question,
+                    },
+                ],
+                max_tokens: 100,
+                temperature: 0.7,
+            }),
+        });
 
-        // this is for that question type where you have to type in the text area
-        const textArea = document.querySelector("textarea");
-        if (textArea) {
-            console.log("Why did this run lol, script should've ended");
-        }
-
-        // If no "converse-pasage-options" div, proceed with other answer methods
-        const liElements = document.querySelectorAll("li");
-        if (liElements.length > 0) {
-            const hasLabels = Array.from(liElements).some((li) =>
-                li.querySelector("label")
-            );
-            if (hasLabels) {
-                selectAllLabels();
-            } else {
-                await sleep(500);
-                liElements.forEach((li) => li.click());
-            }
-            console.log("Answered using li elements.");
-        }
+        const data = await response.json();
+        return data.choices[0]?.message?.content.trim();
     } catch (error) {
-        console.error("Error selecting answer elements:", error);
+        console.error("Error fetching answer from LLM:", error);
+        return null;
     }
 }
 
+// Function to automate answering questions
+async function answerQuestion() {
+    try {
+        // For questions displayed in a text element
+        const questionElement = document.querySelector(".question-text");
+        if (questionElement) {
+            const question = questionElement.textContent.trim();
+            console.log("Extracted question:", question);
+
+            const answer = await fetchAnswerFromLLM(question);
+            console.log("Fetched answer from LLM:", answer);
+
+            if (!answer) {
+                console.warn("No answer received from LLM.");
+                return;
+            }
+
+            // Match answer with available labels or buttons
+            const labels = document.querySelectorAll("label");
+            for (let label of labels) {
+                if (label.textContent.trim() === answer) {
+                    label.click();
+                    return;
+                }
+            }
+
+            const buttons = document.querySelectorAll("button");
+            for (let button of buttons) {
+                if (button.textContent.trim() === answer) {
+                    button.click();
+                    return;
+                }
+            }
+        }
+
+        // For text-area-based questions
+        const textArea = document.querySelector("textarea");
+        if (textArea) {
+            const answer = await fetchAnswerFromLLM("Please provide an appropriate answer.");
+            console.log("Fetched answer for textarea from LLM:", answer);
+
+            if (answer) {
+                textArea.value = answer;
+                triggerTextareaClick(textArea);
+            }
+        }
+    } catch (error) {
+        console.error("Error answering question:", error);
+    }
+}
+
+// Function to move to the next screen
 async function nextScreen() {
     return new Promise(async (resolve) => {
         const submitBtn = document.querySelector("#testSubmit");
@@ -94,13 +133,13 @@ async function nextScreen() {
     });
 }
 
+// Main automation loop
 async function main() {
     while (true) {
         try {
-            // check for start button
-            const startButton = Array.from(
-                document.querySelectorAll("button")
-            ).find((button) => button.textContent.trim() === "Start");
+            // Start button handling
+            const startButton = Array.from(document.querySelectorAll("button"))
+                .find((button) => button.textContent.trim() === "Start");
 
             if (startButton) {
                 console.log("Start button detected, clicking...");
@@ -111,10 +150,10 @@ async function main() {
                 continue;
             }
 
-            // check for continue button
-            const continueButton = Array.from(
-                document.querySelectorAll("button")
-            ).find((button) => button.textContent.trim() === "Continue");
+            // Continue button handling
+            const continueButton = Array.from(document.querySelectorAll("button"))
+                .find((button) => button.textContent.trim() === "Continue");
+
             if (continueButton) {
                 console.log("Continue button detected, clicking...");
                 await sleep(500);
@@ -123,13 +162,11 @@ async function main() {
                 continue;
             }
 
-            // check for submit button
+            // Submit button handling
             const submitBtn = document.querySelector("#testSubmit");
 
             if (submitBtn && !submitBtn.classList.contains("disabledElement")) {
-                console.log(
-                    "Submit button enabled, clicking to go to next screen..."
-                );
+                console.log("Submit button enabled, clicking to go to next screen...");
                 await sleep(500);
                 submitBtn.click();
                 await nextScreen();
@@ -137,32 +174,23 @@ async function main() {
             }
 
             if (submitBtn && submitBtn.classList.contains("disabledElement")) {
-                console.log(
-                    "Submit button is disabled, answering questions..."
-                );
+                console.log("Submit button is disabled, answering questions...");
+
                 const textarea = document.querySelector("textarea");
                 if (textarea) {
                     console.log("Textarea detected, stopping the script.");
-                    alert(
-                        "Typing questions need to be answered manually. Restart script once you're done."
-                    );
-                    return; // exit script cuz textarea is kryptonite
+                    alert("Textarea questions need to be answered manually. Restart script once you're done.");
+                    return;
                 }
 
-                const recordingButton = document.querySelector(
-                    'button[aria-label="start-recording"]'
-                );
+                const recordingButton = document.querySelector('button[aria-label="start-recording"]');
                 if (recordingButton) {
-                    console.log(
-                        "Speech based questions detected, stopping the script."
-                    );
-                    alert(
-                        "Speech based questions need to be done manually. Restart script once you're done."
-                    );
-                    return; // exit script cuz recording can't be automated
+                    console.log("Speech-based questions detected, stopping the script.");
+                    alert("Speech-based questions need to be done manually. Restart script once you're done.");
+                    return;
                 }
 
-                answerQuestion();
+                await answerQuestion();
             }
 
             await sleep(2000);
@@ -172,4 +200,5 @@ async function main() {
     }
 }
 
+// Run the main automation function
 main();
