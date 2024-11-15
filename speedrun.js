@@ -3,7 +3,7 @@ function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Function to trigger a click event
+// Function to trigger a click event on a text area
 function triggerTextareaClick(textarea) {
     const mouseEvent = new MouseEvent("click", {
         bubbles: true,
@@ -14,7 +14,7 @@ function triggerTextareaClick(textarea) {
     textarea.dispatchEvent(mouseEvent);
 }
 
-// Function to call OpenAI's GPT API to get an answer
+// Function to call OpenAI's GPT API for an answer
 async function fetchAnswerFromLLM(question) {
     const apiKey = "0334229e8ccc48329d31675a9bd4717b"; // Replace with your OpenAI API key
     const endpoint = "https://api.openai.com/v1/chat/completions";
@@ -27,7 +27,7 @@ async function fetchAnswerFromLLM(question) {
                 Authorization: `Bearer ${apiKey}`,
             },
             body: JSON.stringify({
-                model: "gpt-4", // Replace with the desired model (e.g., gpt-3.5-turbo)
+                model: "gpt-4", // Replace with your desired model
                 messages: [
                     {
                         role: "system",
@@ -44,17 +44,20 @@ async function fetchAnswerFromLLM(question) {
         });
 
         const data = await response.json();
-        return data.choices[0]?.message?.content.trim();
+        if (data.choices && data.choices.length > 0) {
+            return data.choices[0].message.content.trim();
+        }
+        console.error("No valid response received from LLM:", data);
+        return null;
     } catch (error) {
         console.error("Error fetching answer from LLM:", error);
         return null;
     }
 }
 
-// Function to automate answering questions
+// Function to handle answering questions
 async function answerQuestion() {
     try {
-        // For questions displayed in a text element
         const questionElement = document.querySelector(".question-text");
         if (questionElement) {
             const question = questionElement.textContent.trim();
@@ -68,91 +71,90 @@ async function answerQuestion() {
                 return;
             }
 
-            // Match answer with available labels or buttons
             const labels = document.querySelectorAll("label");
             for (let label of labels) {
-                if (label.textContent.trim() === answer) {
+                if (label.textContent.trim().toLowerCase() === answer.toLowerCase()) {
                     label.click();
+                    console.log("Clicked label matching answer:", answer);
                     return;
                 }
             }
 
             const buttons = document.querySelectorAll("button");
             for (let button of buttons) {
-                if (button.textContent.trim() === answer) {
+                if (button.textContent.trim().toLowerCase() === answer.toLowerCase()) {
                     button.click();
+                    console.log("Clicked button matching answer:", answer);
                     return;
                 }
             }
         }
 
-        // For text-area-based questions
         const textArea = document.querySelector("textarea");
         if (textArea) {
-            const answer = await fetchAnswerFromLLM("Please provide an appropriate answer.");
+            const answer = await fetchAnswerFromLLM("Provide an appropriate answer for a text area.");
             console.log("Fetched answer for textarea from LLM:", answer);
 
             if (answer) {
                 textArea.value = answer;
                 triggerTextareaClick(textArea);
+                console.log("Filled text area with:", answer);
             }
         }
     } catch (error) {
-        console.error("Error answering question:", error);
+        console.error("Error in answerQuestion function:", error);
     }
 }
 
-// Function to move to the next screen
+// Function to handle navigation to the next screen
 async function nextScreen() {
     return new Promise(async (resolve) => {
         const submitBtn = document.querySelector("#testSubmit");
 
         if (submitBtn && !submitBtn.classList.contains("disabledElement")) {
+            console.log("Submit button enabled, clicking...");
             await sleep(500);
             submitBtn.click();
 
             const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
+                for (let mutation of mutations) {
                     if (mutation.type === "childList") {
-                        console.log("Next screen loaded");
+                        console.log("Next screen loaded.");
                         observer.disconnect();
                         resolve();
+                        return;
                     }
-                });
+                }
             });
 
             observer.observe(document.body, {
                 childList: true,
                 subtree: true,
             });
-            console.log("Waiting for next screen to load");
         } else {
-            console.warn("Submit button is still disabled");
+            console.warn("Submit button is disabled.");
             resolve();
         }
     });
 }
 
-// Main automation loop
+// Main loop to automate the process
 async function main() {
     while (true) {
         try {
-            // Start button handling
             const startButton = Array.from(document.querySelectorAll("button"))
-                .find((button) => button.textContent.trim() === "Start");
+                .find((button) => button.textContent.trim().toLowerCase() === "start");
 
             if (startButton) {
                 console.log("Start button detected, clicking...");
                 await sleep(500);
                 startButton.click();
                 await nextScreen();
-                await sleep(2000);
                 continue;
             }
 
-            // Continue button handling
             const continueButton = Array.from(document.querySelectorAll("button"))
-                .find((button) => button.textContent.trim() === "Continue");
+                .find((button) => button.textContent.trim().toLowerCase() === "continue");
 
             if (continueButton) {
                 console.log("Continue button detected, clicking...");
@@ -162,11 +164,9 @@ async function main() {
                 continue;
             }
 
-            // Submit button handling
             const submitBtn = document.querySelector("#testSubmit");
-
             if (submitBtn && !submitBtn.classList.contains("disabledElement")) {
-                console.log("Submit button enabled, clicking to go to next screen...");
+                console.log("Submit button detected, clicking...");
                 await sleep(500);
                 submitBtn.click();
                 await nextScreen();
@@ -175,30 +175,15 @@ async function main() {
 
             if (submitBtn && submitBtn.classList.contains("disabledElement")) {
                 console.log("Submit button is disabled, answering questions...");
-
-                const textarea = document.querySelector("textarea");
-                if (textarea) {
-                    console.log("Textarea detected, stopping the script.");
-                    alert("Textarea questions need to be answered manually. Restart script once you're done.");
-                    return;
-                }
-
-                const recordingButton = document.querySelector('button[aria-label="start-recording"]');
-                if (recordingButton) {
-                    console.log("Speech-based questions detected, stopping the script.");
-                    alert("Speech-based questions need to be done manually. Restart script once you're done.");
-                    return;
-                }
-
                 await answerQuestion();
             }
 
             await sleep(2000);
         } catch (error) {
-            console.error("Error in main loop, restarting script...", error);
+            console.error("Error in main loop:", error);
         }
     }
 }
 
-// Run the main automation function
+// Start the script
 main();
