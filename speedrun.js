@@ -1,20 +1,9 @@
-// Helper function to add delay
+// Helper function for delay
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Function to trigger a click event on a text area
-function triggerTextareaClick(textarea) {
-    const mouseEvent = new MouseEvent("click", {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-    });
-
-    textarea.dispatchEvent(mouseEvent);
-}
-
-// Function to call OpenAI's GPT API for an answer
+// Function to fetch the answer using OpenAI API
 async function fetchAnswerFromLLM(question) {
     const apiKey = "0334229e8ccc48329d31675a9bd4717b"; // Replace with your OpenAI API key
     const endpoint = "https://api.openai.com/v1/chat/completions";
@@ -27,16 +16,10 @@ async function fetchAnswerFromLLM(question) {
                 Authorization: `Bearer ${apiKey}`,
             },
             body: JSON.stringify({
-                model: "gpt-4", // Replace with your desired model
+                model: "gpt-4", // Adjust model if needed
                 messages: [
-                    {
-                        role: "system",
-                        content: "You are a helpful assistant.",
-                    },
-                    {
-                        role: "user",
-                        content: question,
-                    },
+                    { role: "system", content: "You are a helpful assistant." },
+                    { role: "user", content: question },
                 ],
                 max_tokens: 100,
                 temperature: 0.7,
@@ -47,7 +30,7 @@ async function fetchAnswerFromLLM(question) {
         if (data.choices && data.choices.length > 0) {
             return data.choices[0].message.content.trim();
         }
-        console.error("No valid response received from LLM:", data);
+        console.error("No valid response from LLM:", data);
         return null;
     } catch (error) {
         console.error("Error fetching answer from LLM:", error);
@@ -55,58 +38,85 @@ async function fetchAnswerFromLLM(question) {
     }
 }
 
-// Function to handle answering questions
-async function answerQuestion() {
+// Function to handle MCQs
+async function handleMCQs(questionText) {
     try {
-        const questionElement = document.querySelector(".question-text");
-        if (questionElement) {
-            const question = questionElement.textContent.trim();
-            console.log("Extracted question:", question);
+        const answer = await fetchAnswerFromLLM(questionText);
+        console.log("Fetched answer from LLM:", answer);
 
-            const answer = await fetchAnswerFromLLM(question);
-            console.log("Fetched answer from LLM:", answer);
+        if (!answer) {
+            console.warn("No answer received for MCQ.");
+            return;
+        }
 
-            if (!answer) {
-                console.warn("No answer received from LLM.");
+        const labels = document.querySelectorAll("label");
+        for (let label of labels) {
+            const labelText = label.textContent.trim();
+            console.log("Checking label:", labelText);
+            if (labelText.toLowerCase() === answer.toLowerCase()) {
+                label.click();
+                console.log("Clicked label:", labelText);
                 return;
             }
-
-            const labels = document.querySelectorAll("label");
-            for (let label of labels) {
-                if (label.textContent.trim().toLowerCase() === answer.toLowerCase()) {
-                    label.click();
-                    console.log("Clicked label matching answer:", answer);
-                    return;
-                }
-            }
-
-            const buttons = document.querySelectorAll("button");
-            for (let button of buttons) {
-                if (button.textContent.trim().toLowerCase() === answer.toLowerCase()) {
-                    button.click();
-                    console.log("Clicked button matching answer:", answer);
-                    return;
-                }
-            }
         }
 
-        const textArea = document.querySelector("textarea");
-        if (textArea) {
-            const answer = await fetchAnswerFromLLM("Provide an appropriate answer for a text area.");
-            console.log("Fetched answer for textarea from LLM:", answer);
-
-            if (answer) {
-                textArea.value = answer;
-                triggerTextareaClick(textArea);
-                console.log("Filled text area with:", answer);
-            }
-        }
+        console.warn("Answer not matched with any label.");
     } catch (error) {
-        console.error("Error in answerQuestion function:", error);
+        console.error("Error handling MCQs:", error);
     }
 }
 
-// Function to handle navigation to the next screen
+// Function to handle text areas
+async function handleTextArea() {
+    const textArea = document.querySelector("textarea");
+    if (textArea) {
+        const question = "Provide an appropriate response for a text-based question.";
+        const answer = await fetchAnswerFromLLM(question);
+        console.log("Fetched answer for text area:", answer);
+
+        if (answer) {
+            textArea.value = answer;
+            textArea.dispatchEvent(new Event("input", { bubbles: true }));
+            console.log("Text area filled with:", answer);
+        }
+    }
+}
+
+// Function to answer the current question
+async function answerQuestion() {
+    try {
+        const questionElement = document.querySelector(".question-text");
+        if (!questionElement) {
+            console.warn("No question text element found.");
+            return;
+        }
+
+        const questionText = questionElement.textContent.trim();
+        console.log("Extracted question:", questionText);
+
+        // Check for MCQs
+        const hasMCQs = document.querySelectorAll("label").length > 0;
+        if (hasMCQs) {
+            console.log("MCQ detected. Handling MCQs...");
+            await handleMCQs(questionText);
+            return;
+        }
+
+        // Check for text areas
+        const textArea = document.querySelector("textarea");
+        if (textArea) {
+            console.log("Text area detected. Handling text area...");
+            await handleTextArea();
+            return;
+        }
+
+        console.warn("No known question type detected.");
+    } catch (error) {
+        console.error("Error answering question:", error);
+    }
+}
+
+// Function to move to the next screen
 async function nextScreen() {
     return new Promise(async (resolve) => {
         const submitBtn = document.querySelector("#testSubmit");
@@ -132,7 +142,7 @@ async function nextScreen() {
                 subtree: true,
             });
         } else {
-            console.warn("Submit button is disabled.");
+            console.warn("Submit button is disabled or not found.");
             resolve();
         }
     });
