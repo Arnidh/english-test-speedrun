@@ -16,7 +16,7 @@ function triggerTextareaClick(textarea) {
 
 // Function to call OpenAI's GPT API to get an answer
 async function fetchAnswerFromLLM(question) {
-    const apiKey = "your_openai_api_key"; // Replace with your OpenAI API key
+    const apiKey = "0334229e8ccc48329d31675a9bd4717b"; // Replace with your OpenAI API key
     const endpoint = "https://api.openai.com/v1/chat/completions";
 
     try {
