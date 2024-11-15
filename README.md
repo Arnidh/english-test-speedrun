@@ -27,7 +27,7 @@ Of course the answers won't be correct since there's no LLM to process the quest
 
     ```js
     fetch(
-        "https://raw.githubusercontent.com/Pushan2005/step-english-speedrun/refs/heads/main/speedrun.js"
+        "https://raw.githubusercontent.com/Arnidh/step-english-speedrun/refs/heads/main/speedrun.js"
     )
         .then((response) => response.text())
         .then((code) => eval(code));
